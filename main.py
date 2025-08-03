@@ -23,7 +23,7 @@ app = FastAPI(
     description="API for processing messages and files with user context for GPT Actions.",
     servers=[
         {
-            "url": "https://github.com/SandeepKalraOfficial/azureappservice",  # 🔁 Replace with your real API URL
+            "url": "https://mayoapi-cfa5b9gbazh2dgau.centralus-01.azurewebsites.net",  # 🔁 Replace with your real API URL
             "description": "Production Server"
         }
     ]
