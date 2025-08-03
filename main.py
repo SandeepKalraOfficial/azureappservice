@@ -23,7 +23,7 @@ app = FastAPI(
     description="API for processing messages and files with user context for GPT Actions.",
     servers=[
         {
-            "url": "https://api.yourdomain.com",  # 🔁 Replace with your real API URL
+            "url": "https://github.com/SandeepKalraOfficial/azureappservice",  # 🔁 Replace with your real API URL
             "description": "Production Server"
         }
     ]
@@ -160,6 +160,6 @@ async def health_check():
 app.include_router(message_router, prefix="/message", tags=["Messages"])
 app.include_router(document_router, prefix="/document", tags=["Documents"])
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
