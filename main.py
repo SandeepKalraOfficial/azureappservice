@@ -154,6 +154,7 @@ async def upload_document(
 )
 async def health_check():
     logger.info("Health check OK")
+    print("HEALTH API invoked.")
     return {"status": "ok"}
 
 # ==== Register Routers ====
