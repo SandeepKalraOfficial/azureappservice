@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+import base64
 
 # ==== Logger Setup ====
 logging.basicConfig(
@@ -50,6 +51,13 @@ class UserMessage(BaseModel):
     userId: str
     username: str
     message: str
+
+class UserMessageWithBase64(BaseModel):
+    userId: str
+    username: str
+    message: str
+    filename: str
+    fileData: str  # base64-encoded file content
 
 class MessageResponse(BaseModel):
     userId: str
@@ -110,6 +118,37 @@ document_router = APIRouter()
 )
 async def process_message(msg: UserMessage):
     return handle_user_message(msg)
+
+
+
+@message_router.post(
+    "/with-messangeAndbase64File",
+    response_model=MessageWithFileResponse,
+    responses={500: {"model": ErrorResponse}},
+    openapi_extra={"operationId": "sendMessageWithBase64"}
+)
+async def process_message_with_base64_file(msg: UserMessageWithBase64):
+    try:
+        UPLOAD_DIR = "uploaded_documents"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        file_path = os.path.join(UPLOAD_DIR, msg.filename)
+        with open(file_path, "wb") as f:
+            f.write(base64.b64decode(msg.fileData))
+        file_result = {"filename": msg.filename, "status": "uploaded"}
+        message_result = handle_user_message(UserMessage(
+            userId=msg.userId,
+            username=msg.username,
+            message=msg.message
+        ))
+        result = {
+            "messageResponse": message_result,
+            "fileUpload": file_result
+        }
+        logger.info(f"Base64 file and message processed: {result}")
+        return result
+    except Exception as e:
+        logger.exception("Base64 file processing failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @message_router.post(
     "/with-file",
