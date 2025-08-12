@@ -1,19 +1,18 @@
 import os
 import logging
-from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, Request, Response
+import json
+import base64
+from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, Request, Response, Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
-import base64
 
 # ==== Logger Setup ====
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("gpt_action_api")
 
@@ -24,7 +23,7 @@ app = FastAPI(
     description="API for processing messages and files with user context for GPT Actions.",
     servers=[
         {
-            "url": "https://mayoapi-cfa5b9gbazh2dgau.centralus-01.azurewebsites.net",  # 🔁 Replace with your real API URL
+            "url": "https://mayoapi-cfa5b9gbazh2dgau.centralus-01.azurewebsites.net",
             "description": "Production Server"
         }
     ]
@@ -46,6 +45,20 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(LoggingMiddleware)
 
+# ==== User Extraction from Azure AD Headers ====
+async def get_user_from_request(request: Request) -> dict:
+    principal_encoded = request.headers.get("X-MS-CLIENT-PRINCIPAL")
+    if principal_encoded:
+        try:
+            principal_decoded = base64.b64decode(principal_encoded).decode("utf-8")
+            principal_json = json.loads(principal_decoded)
+            claims = {claim["typ"]: claim["val"] for claim in principal_json.get("claims", [])}
+            return claims
+        except Exception as e:
+            logger.warning(f"Failed to decode user principal: {e}")
+            return {}
+    return {}
+
 # ==== Schemas ====
 class UserMessage(BaseModel):
     userId: str
@@ -57,7 +70,7 @@ class UserMessageWithBase64(BaseModel):
     username: str
     message: str
     filename: str
-    fileData: str  # base64-encoded file content
+    fileData: str
 
 class MessageResponse(BaseModel):
     userId: str
@@ -118,8 +131,6 @@ document_router = APIRouter()
 )
 async def process_message(msg: UserMessage):
     return handle_user_message(msg)
-
-
 
 @message_router.post(
     "/with-messangeAndbase64File",
@@ -185,21 +196,19 @@ async def upload_document(
 ):
     return save_document(file)
 
+# ==== Health Check with User Info ====
 @app.get(
     "/health",
     response_model=HealthStatus,
     responses={500: {"model": ErrorResponse}},
     openapi_extra={"operationId": "checkHealth"}
 )
-async def health_check():
-    logger.info("Health check OK")
-    print("HEALTH API invoked.")
-    return {"status": "ok"}
+async def health_check(request: Request):
+    user_claims = await get_user_from_request(request)
+    email = user_claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress", "unknown")
+    logger.info(f"Health check invoked by user: {email}")
+    return {"status": f"ok - user: {email}"}
 
 # ==== Register Routers ====
 app.include_router(message_router, prefix="/message", tags=["Messages"])
 app.include_router(document_router, prefix="/document", tags=["Documents"])
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
