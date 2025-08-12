@@ -197,17 +197,13 @@ async def upload_document(
     return save_document(file)
 
 # ==== Health Check with User Info ====
-@app.get(
-    "/health",
-    response_model=HealthStatus,
-    responses={500: {"model": ErrorResponse}},
-    openapi_extra={"operationId": "checkHealth"}
-)
+@app.get("/health")
 async def health_check(request: Request):
+    # logger.info(f"Headers: {dict(request.headers)}")  # Log all headers
     user_claims = await get_user_from_request(request)
     email = user_claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress", "unknown")
     logger.info(f"Health check invoked by user: {email}")
-    return {"status": f"ok - user: {email}"}
+    return {"status": f"ok - user: {email}", "claims": user_claims}
 
 # ==== Register Routers ====
 app.include_router(message_router, prefix="/message", tags=["Messages"])
